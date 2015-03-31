@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Container xmlns="http://servicemesh.com/agility/api">
+    <id>CONTAINER_ID</id>
+</Container>
