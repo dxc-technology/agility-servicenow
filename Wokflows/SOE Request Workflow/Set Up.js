@@ -30,7 +30,7 @@ function getContainerID() {
  * Build ServiceNow callback URL
  */
 function getCallBackURL(){
-	return "https://" + gs.getProperty('instance_name') +".pncbank.com/ProvisioningTaskComplete.do?webservices";
+	return gs.getProperty('glide.servlet.uri') +"webservices/ProvisioningTaskComplete.do?SOAP";
 }
 
 /*

@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<unload unload_date="2015-04-20 14:25:02">
+<sys_web_service action="INSERT_OR_UPDATE">
+<active>true</active>
+<function_name>execute</function_name>
+<name>ProvisioningTaskComplete</name>
+<script><![CDATA[/*
+ * This callback endpoint is used to recieve task completion notification for both: dedicated and shared infrastructure requests
+ *
+ * request_number  :ServiceNow request number (i.e.: current.number) that initiated the long running process in Agility or vCO
+ * result          :Status code of the task, where 0 = OK; non-0 = error code
+ * error_message   :Additional info about the error, if result != 0
+ * data            :Placeholder for additional information.  If it's coming from Agility, this could be JSON string containing IP
+ *                  addresses and hostnames of the VMs that were provisioned.  vCO currently doe not provide any additional information.
+ *
+ */
+var source = "gf callback";
+var request_number = request.request_number;
+var request_result = Number(request.result);
+
+gs.log(request_number + ' : Provisioning Task Completed : Callback Received', source);
+gs.log(request_number + ' : Provisioning Task Completed : Result Code : ' + request_result, source);
+if (request_result != 0) {
+    gs.log(request_number + ' : Provisioning Task Completed : Error Message : ' + request.error_message, source);
+} else {
+    gs.log(request_number + ' : Provisioning Task Completed : Payload : ' + request.data, source);
+}
+
+//used for dedicated and shared application reqeusts
+updateRequest();
+
+function updateRequest() {
+    var gr = new GlideRecord("sc_req_item");
+    gr.addQuery("number", request_number);
+    gr.query();
+    if (gr.next()) {
+        gs.log(request_number + " : Request item found!", source);
+        if (request_result == 0) {
+            gs.log(request_number + " : Setting provisioning status from " + gr.variables.provisioning_status + " to " + "completed", source);
+            /* Handle callback from WAS request
+            
+            WAS request is complex as we have two async requests to Agility:
+            one to provision WAS Deployment Manager (DMGR)
+            and another to provision Cell Nodes.
+            
+            So, we are getting two callbacks back.
+            As part of our handshake when invoking WAS Deployment Manager and WAS Nodes
+            blueprints, we mark them with WAS_DMGR and WAS_Nodes.
+            
+            Here we determine which one of the tasks has completed.
+            */
+            if (request.data.indexOf('WAS_DMGR') != -1) {
+                gr.variables.dmgr_callback = request.data;
+            } else if (request.data.indexOf('WAS_NODES') != -1) {
+                gr.variables.nodes_callback = request.data;
+            } else {
+                // otherwise, this is a SOE request calling us back
+                gr.variables.provisioning_soe_callback = request.data;
+            }
+            gr.variables.provisioning_status = 'completed';
+
+        } else {
+            gs.log(request_number + " : Setting provisioning status from " + gr.variables.provisioning_status + " to " + "failed", source);
+            gr.variables.provisioning_status = 'failed';
+            gr.variables.provisioning_error_message = request.error_message;
+
+        }
+        gr.update();
+    } else {
+        gs.log(request_number + " : No request item found!", source);
+    }
+}
+
+//
+response.callback_response = 'received';]]></script>
+<short_description>GF Auto: Task completion / notification method by which Agility and vCO inform ServiceNow workflows that a long running process has completed.  Details are provided in the payload. </short_description>
+<sys_created_by>XX599203</sys_created_by>
+<sys_created_on>2015-03-10 20:54:09</sys_created_on>
+<sys_id>c7d5e65cc87a350089c703ecef0faa50</sys_id>
+<sys_mod_count>109</sys_mod_count>
+<sys_updated_by>XX59782</sys_updated_by>
+<sys_updated_on>2015-04-10 21:15:48</sys_updated_on>
+<wsdl>https://webdev5-itsm.pncbank.com/ProvisioningTaskComplete.do?WSDL</wsdl>
+</sys_web_service>
+</unload>
